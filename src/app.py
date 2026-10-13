@@ -97,17 +97,25 @@ def signup_for_activity(activity_name: str, email: str):
 
     # Get the specific activity
     activity = activities[activity_name]
+    normalized_email = email.strip().lower()
 
     # Validate student is not already signed up
-    if email in activity["participants"]:
+    if normalized_email in {participant.strip().lower() for participant in activity["participants"]}:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="Student is already signed up for this activity"
-            )
+        )
+
+    # Validate activity has room for more participants
+    if len(activity["participants"]) >= activity["max_participants"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Activity is full"
+        )
 
     # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
+    activity["participants"].append(normalized_email)
+    return {"message": f"Signed up {normalized_email} for {activity_name}"}
 
 
 @app.delete("/activities/{activity_name}/signup")
@@ -117,11 +125,17 @@ def unregister_from_activity(activity_name: str, email: str):
         raise HTTPException(status_code=404, detail="Activity not found")
 
     participants = activities[activity_name]["participants"]
-    if email not in participants:
+    normalized_email = email.strip().lower()
+    participant_index = next(
+        (index for index, participant in enumerate(participants) if participant.strip().lower() == normalized_email),
+        None,
+    )
+
+    if participant_index is None:
         raise HTTPException(
             status_code=404,
             detail="Student is not signed up for this activity"
         )
 
-    participants.remove(email)
-    return {"message": f"Unregistered {email} from {activity_name}"}
+    removed_email = participants.pop(participant_index)
+    return {"message": f"Unregistered {removed_email} from {activity_name}"}
